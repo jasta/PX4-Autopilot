@@ -31,17 +31,7 @@
 #
 ############################################################################
 
-if(DEFINED ENV{AUTOPILOT_HOST})
-	set(AUTOPILOT_HOST $ENV{AUTOPILOT_HOST})
-else()
-	set(AUTOPILOT_HOST "skipp3r")
-endif()
-
-add_custom_target(upload
-	COMMAND rsync -arh --progress
-			${CMAKE_RUNTIME_OUTPUT_DIRECTORY} ${PX4_SOURCE_DIR}/posix-configs/rpi/*.config ${PX4_BINARY_DIR}/etc # source
-			jasta@${AUTOPILOT_HOST}:/home/jasta/px4 # destination
-	DEPENDS px4
-	COMMENT "uploading px4"
-	USES_TERMINAL
+add_library(drivers_board
+	i2c.cpp
+	spi.cpp
 )

@@ -119,7 +119,7 @@ int PCA9685::initReg()
     }
 
 	buf[0] = PCA9685_REG_MODE1;
-	buf[1] = DEFAULT_MODE1_CFG;
+	buf[1] = DEFAULT_MODE1_CFG & (~PCA9685_MODE1_SLEEP_MASK);
 	ret = transfer(buf, 2, nullptr, 0); // make sure oscillator is disabled
 
 	if (OK != ret) {
@@ -164,9 +164,28 @@ int PCA9685::setPWM(uint8_t channel, const uint16_t &value)
     return ret;
 }
 
+int PCA9685::enableAutoIncrement() {
+    uint8_t buf[2] = {};
+
+    buf[0] = PCA9685_REG_MODE1;
+    buf[2] = DEFAULT_MODE1_CFG | PCA9685_MODE1_AI_MASK;
+
+    int ret = transfer(buf, 2, nullptr, 0);
+
+    if (PX4_OK != ret) {
+        PX4_INFO("enableAutoIncrement: ret=%d", ret);
+    }
+    return ret;
+}
+
 int PCA9685::setPWM(uint8_t channel_count, const uint16_t *value)
 {
     PX4_INFO("setPWM: channels=%d", channel_count);
+
+    int ret = enableAutoIncrement();
+    if (PX4_OK != ret) {
+        return ret;
+    }
 
 	uint8_t buf[PCA9685_PWM_CHANNEL_COUNT * PCA9685_REG_LED_INCREMENT + 1] = {};
 	buf[0] = PCA9685_REG_LED0;
@@ -227,9 +246,10 @@ int PCA9685::setDivider(uint8_t value)
 
 void PCA9685::stopOscillator()
 {
-	uint8_t buf[2] = {PCA9685_REG_MODE1};
+	uint8_t buf[2] = {};
 
 	// set to sleep
+    buf[0] = PCA9685_REG_MODE1;
 	buf[1] = DEFAULT_MODE1_CFG;
 	int ret = transfer(buf, 2, nullptr, 0);
 
@@ -243,9 +263,10 @@ void PCA9685::startOscillator()
 {
     PX4_INFO("startOscillator...");
 
-	uint8_t buf[2] = {PCA9685_REG_MODE1};
+	uint8_t buf[2] = {};
 
 	// clear sleep bit, with restart bit = 0
+    buf[0] = PCA9685_REG_MODE1;
 	buf[1] = DEFAULT_MODE1_CFG & (~PCA9685_MODE1_SLEEP_MASK);
 	int ret = transfer(buf, 2, nullptr, 0);
 

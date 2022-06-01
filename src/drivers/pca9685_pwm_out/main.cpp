@@ -472,6 +472,7 @@ void PCA9685Wrapper::Run()
 		_mixing_output.updateSubscriptions(false);
 
 		if (_targetFreq > 0.0f) { // check if frequency should be changed
+            PX4_INFO("Err, ignoring _targetFreq of %.3f", (double)_targetFreq);
 //			ScheduleClear();
 //			pca9685->disableAllOutput();
 //			pca9685->stopOscillator();

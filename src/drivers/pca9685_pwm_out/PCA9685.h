@@ -149,7 +149,7 @@ protected:
 #ifdef PCA9685_CLOCL_EXT
 	static const uint8_t DEFAULT_MODE1_CFG = 0x70;  // Auto-Increment, Sleep, EXTCLK
 #else
-	static const uint8_t DEFAULT_MODE1_CFG = PCA9685_MODE1_AI_MASK;
+	static const uint8_t DEFAULT_MODE1_CFG = PCA9685_MODE1_ALLCALL_MASK;
 #endif
 	static const uint8_t DEFAULT_MODE2_CFG = PCA9685_MODE2_OUTDRV_MASK;  // totem pole
 
@@ -166,6 +166,8 @@ protected:
 	 * value should be range of 0-4095
 	 */
 	int setPWM(uint8_t channel_count, const uint16_t *value);
+
+    int enableAutoIncrement();
 
 private:
 

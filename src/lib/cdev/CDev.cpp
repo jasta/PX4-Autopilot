@@ -117,7 +117,7 @@ CDev::unregister_class_devname(const char *class_devname, unsigned class_instanc
 int
 CDev::init()
 {
-	PX4_DEBUG("CDev::init");
+	PX4_INFO("the other CDev::init");
 
 	int ret = PX4_OK;
 
@@ -125,11 +125,14 @@ CDev::init()
 	if (_devname != nullptr) {
 		ret = register_driver(_devname, &fops, 0666, (void *)this);
 
+        PX4_INFO("register_driver(%s): ret=%d", _devname, ret);
+
 		if (ret == PX4_OK) {
 			_registered = true;
 		}
 
 	} else {
+        PX4_INFO("bummer, ENODEV...");
 		ret = -ENODEV;
 	}
 

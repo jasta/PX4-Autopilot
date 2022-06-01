@@ -112,7 +112,12 @@ public:
 
 	int setFreq(float freq);
 
-	~PCA9685() override = default;
+    /*
+     * set clock divider
+     */
+    int setDivider(uint8_t value);
+
+    ~PCA9685() override = default;
 
 	int initReg();
 
@@ -144,9 +149,9 @@ protected:
 #ifdef PCA9685_CLOCL_EXT
 	static const uint8_t DEFAULT_MODE1_CFG = 0x70;  // Auto-Increment, Sleep, EXTCLK
 #else
-	static const uint8_t DEFAULT_MODE1_CFG = 0x30;  // Auto-Increment, Sleep
+	static const uint8_t DEFAULT_MODE1_CFG = PCA9685_MODE1_AI_MASK;
 #endif
-	static const uint8_t DEFAULT_MODE2_CFG = 0x04;  // totem pole
+	static const uint8_t DEFAULT_MODE2_CFG = PCA9685_MODE2_OUTDRV_MASK;  // totem pole
 
 	float _Freq = PWM_DEFAULT_FREQUENCY;
 
@@ -154,18 +159,13 @@ protected:
 	 * set PWM value for a channel[0,15].
 	 * value should be range of 0-4095
 	 */
-	void setPWM(uint8_t channel, const uint16_t &value);
+	int setPWM(uint8_t channel, const uint16_t &value);
 
 	/**
 	 * set all PWMs in a single I2C transmission.
 	 * value should be range of 0-4095
 	 */
-	void setPWM(uint8_t channel_count, const uint16_t *value);
-
-	/*
-	 * set clock divider
-	 */
-	void setDivider(uint8_t value);
+	int setPWM(uint8_t channel_count, const uint16_t *value);
 
 private:
 

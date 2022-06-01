@@ -50,5 +50,8 @@
 // SPI
 #define CONFIG_SPI 1
 
+#define ADC_BATTERY_VOLTAGE_CHANNEL 0
+#define ADC_BATTERY_CURRENT_CHANNEL -1
+
 #include <system_config.h>
 #include <px4_platform_common/board_common.h>

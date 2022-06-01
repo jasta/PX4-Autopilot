@@ -87,6 +87,8 @@ I2C::init()
 	snprintf(dev_path, sizeof(dev_path), "/dev/i2c-%i", get_device_bus());
 	_fd = ::open(dev_path, O_RDWR);
 
+    PX4_INFO("trying %s", dev_path);
+
 	if (_fd < 0) {
 		DEVICE_DEBUG("failed to init I2C");
 		ret = -ENOENT;

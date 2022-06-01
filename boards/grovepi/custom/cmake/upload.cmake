@@ -34,13 +34,13 @@
 if(DEFINED ENV{AUTOPILOT_HOST})
 	set(AUTOPILOT_HOST $ENV{AUTOPILOT_HOST})
 else()
-	set(AUTOPILOT_HOST "raspberrypi")
+	set(AUTOPILOT_HOST "skipp3r")
 endif()
 
 if(DEFINED ENV{AUTOPILOT_USER})
 	set(AUTOPILOT_USER $ENV{AUTOPILOT_USER})
 else()
-	set(AUTOPILOT_USER "pi")
+	set(AUTOPILOT_USER "jasta")
 endif()
 
 add_custom_target(upload

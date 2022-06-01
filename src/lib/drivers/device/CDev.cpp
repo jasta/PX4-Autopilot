@@ -54,10 +54,12 @@ CDev::CDev(const char *name, const char *devname) :
 
 int CDev::init()
 {
-	PX4_DEBUG("CDev::init");
+	PX4_INFO("CDev::init");
 
 	// base class init first
 	int ret = Device::init();
+
+    PX4_INFO("Device::init(): ret=%d", ret);
 
 	if (ret != PX4_OK) {
 		goto out;
@@ -66,6 +68,8 @@ int CDev::init()
 	// now register the driver
 	if (get_devname() != nullptr) {
 		ret = cdev::CDev::init();
+
+        PX4_INFO("cdev::CDev::init(): ret=%d", ret);
 
 		if (ret != PX4_OK) {
 			goto out;

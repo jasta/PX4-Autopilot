@@ -42,6 +42,8 @@
 #include "../CDev.hpp"
 #include <px4_platform_common/i2c.h>
 
+#define CONFIG_I2C 1
+
 #if defined(CONFIG_I2C)
 
 struct I2CSPIDriverConfig;

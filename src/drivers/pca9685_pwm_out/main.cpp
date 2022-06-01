@@ -92,7 +92,9 @@ private:
 
 	enum class STATE : uint8_t {
 		INIT,
-		WAIT_FOR_OSC,
+		WAIT_FOR_OSC1,
+        WAIT_FOR_OSC2,
+        WAIT_FOR_OSC3,
 		RUNNING
 	};
 	STATE _state{STATE::INIT};
@@ -121,7 +123,7 @@ protected:
 };
 
 PCA9685Wrapper::PCA9685Wrapper(int schd_rate_limit) :
-	CDev(nullptr),
+	CDev("/dev/pwm_output"),
 	OutputModuleInterface(MODULE_NAME, px4::wq_configurations::hp_default),
 	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")),
 	_schd_rate_limit(schd_rate_limit)
@@ -146,13 +148,19 @@ PCA9685Wrapper::~PCA9685Wrapper()
 
 int PCA9685Wrapper::init()
 {
+    PX4_INFO("CDev::init...");
+
 	int ret = CDev::init();
+
+    PX4_INFO("CDev::init(): ret=%d", ret);
 
 	if (ret != PX4_OK) {
 		return ret;
 	}
 
 	ret = pca9685->init();
+
+    PX4_INFO("pca9685->init(): ret=%d", ret);
 
 	if (ret != PX4_OK) {
 		return ret;
@@ -394,29 +402,48 @@ void PCA9685Wrapper::Run()
 	perf_begin(_cycle_perf);
 
 	switch (_state) {
-	case STATE::INIT:
-		pca9685->initReg();
-		updatePWMParams();  // target frequency fetched, immediately apply it
+	case STATE::INIT: {
+//        int ret = pca9685->setFreq(50.0f);    // this should not fail
+//        int ret = pca9685->setDivider(121);
+//        PX4_INFO("setFreq 2nd try: ret=%d", ret);
+        int ret2 = pca9685->initReg();
+        PX4_INFO("initReg: ret=%d", ret2);
+        updatePWMParams();  // target frequency fetched, immediately apply it
 
-		if (_targetFreq > 0.0f) {
-			if (pca9685->setFreq(_targetFreq) != PX4_OK) {
-				PX4_ERR("failed to set pwm frequency to %.2f, fall back to 50Hz", (double)_targetFreq);
-				pca9685->setFreq(50.0f);	// this should not fail
-			}
+//        if (_targetFreq > 0.0f) {
+////			if (pca9685->setFreq(_targetFreq) != PX4_OK) {
+////				PX4_ERR("failed to set pwm frequency to %.2f, fall back to 50Hz", (double)_targetFreq);
+////			}
+//
+//            _targetFreq = -1.0f;
 
-			_targetFreq = -1.0f;
+//        } else {
+//            // should not happen
+//            PX4_ERR("INIT failed: invalid initial frequency settings");
+//        }
 
-		} else {
-			// should not happen
-			PX4_ERR("INIT failed: invalid initial frequency settings");
-		}
+        _state = STATE::WAIT_FOR_OSC1;
+        ScheduleDelayed(500);
+        }
+        break;
 
-		pca9685->startOscillator();
-		_state = STATE::WAIT_FOR_OSC;
-		ScheduleDelayed(500);
-		break;
+        case STATE::WAIT_FOR_OSC1: {
+            pca9685->startOscillator();
+            _state = STATE::WAIT_FOR_OSC2;
+            ScheduleDelayed(500);
+        }
+        break;
 
-	case STATE::WAIT_FOR_OSC: {
+	case STATE::WAIT_FOR_OSC2: {
+        pca9685->stopOscillator();
+        pca9685->setFreq(50);
+        pca9685->startOscillator();
+        _state = STATE::WAIT_FOR_OSC3;
+        ScheduleDelayed(500);
+    }
+    break;
+
+        case STATE::WAIT_FOR_OSC3: {
 			pca9685->triggerRestart();  // start actual outputting
 			_state = STATE::RUNNING;
 			float schedule_rate = pca9685->getFrequency();
@@ -445,19 +472,18 @@ void PCA9685Wrapper::Run()
 		_mixing_output.updateSubscriptions(false);
 
 		if (_targetFreq > 0.0f) { // check if frequency should be changed
-			ScheduleClear();
-			pca9685->disableAllOutput();
-			pca9685->stopOscillator();
-
-			if (pca9685->setFreq(_targetFreq) != PX4_OK) {
-				PX4_ERR("failed to set pwm frequency, fall back to 50Hz");
-				pca9685->setFreq(50.0f);	// this should not fail
-			}
-
+//			ScheduleClear();
+//			pca9685->disableAllOutput();
+//			pca9685->stopOscillator();
+//
+////			if (pca9685->setFreq(_targetFreq) != PX4_OK) {
+////				PX4_ERR("failed to set pwm frequency, fall back to 50Hz");
+//				pca9685->setFreq(50.0f);	// this should not fail
+////			}
+//
 			_targetFreq = -1.0f;
-			pca9685->startOscillator();
-			_state = STATE::WAIT_FOR_OSC;
-			ScheduleDelayed(500);
+//			_state = STATE::WAIT_FOR_OSC1;
+//			ScheduleDelayed(500);
 		}
 
 		break;

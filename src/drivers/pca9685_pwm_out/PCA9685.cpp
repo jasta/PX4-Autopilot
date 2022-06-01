@@ -73,17 +73,19 @@ int PCA9685::updatePWM(const uint16_t *outputs, unsigned num_outputs)
 
 int PCA9685::setFreq(float freq)
 {
+    PX4_INFO("setFreq: freq=%f", (double)freq);
+
 	uint16_t realResolution = floorl((float)PCA9685_CLOCK_FREQ / freq);
 
 	if (realResolution < PCA9685_PWM_RES) { // unable to provide enough resolution
-		PX4_DEBUG("frequency too high");
+		PX4_INFO("frequency too high");
 		return -EINVAL;
 	}
 
 	uint16_t divider = (uint16_t)round((float)PCA9685_CLOCK_FREQ / freq / PCA9685_PWM_RES) - 1;
 
 	if (divider > 0x00FF) { // out of divider
-		PX4_DEBUG("frequency too low");
+		PX4_INFO("frequency too low");
 		return -EINVAL;
 	}
 
@@ -98,40 +100,39 @@ int PCA9685::setFreq(float freq)
 
 	_Freq = (float)PCA9685_CLOCK_FREQ / (float)(divider + (uint16_t)1) / PCA9685_PWM_RES; // use actual pwm freq instead.
 
-	setDivider(divider);
-
-	return PX4_OK;
-
+	return setDivider(divider);
 }
 
 int PCA9685::initReg()
 {
+    PX4_INFO("initReg...");
+
 	uint8_t buf[2] = {};
+
+    buf[0] = PCA9685_REG_MODE2;
+    buf[1] = DEFAULT_MODE2_CFG;
+    int ret = transfer(buf, 2, nullptr, 0);
+
+    if (OK != ret) {
+        PX4_ERR("init_3: i2c::transfer returned %d", ret);
+        return ret;
+    }
 
 	buf[0] = PCA9685_REG_MODE1;
 	buf[1] = DEFAULT_MODE1_CFG;
-	int ret = transfer(buf, 2, nullptr, 0); // make sure oscillator is disabled
+	ret = transfer(buf, 2, nullptr, 0); // make sure oscillator is disabled
 
 	if (OK != ret) {
-		PX4_ERR("init: i2c::transfer returned %d", ret);
+		PX4_ERR("init_1: i2c::transfer returned %d", ret);
 		return ret;
 	}
 
-	ret = transfer(buf, 2, nullptr, 0); // enable EXTCLK if possible
-
-	if (OK != ret) {
-		PX4_ERR("init: i2c::transfer returned %d", ret);
-		return ret;
-	}
-
-	buf[0] = PCA9685_REG_MODE2;
-	buf[1] = DEFAULT_MODE2_CFG;
-	ret = transfer(buf, 2, nullptr, 0);
-
-	if (OK != ret) {
-		PX4_ERR("init: i2c::transfer returned %d", ret);
-		return ret;
-	}
+//	ret = transfer(buf, 2, nullptr, 0); // enable EXTCLK if possible
+//
+//	if (OK != ret) {
+//		PX4_ERR("init_2: i2c::transfer returned %d", ret);
+//		return ret;
+//	}
 
 	return PX4_OK;
 }
@@ -141,11 +142,11 @@ int PCA9685::probe()
 	return I2C::probe();
 }
 
-void PCA9685::setPWM(uint8_t channel, const uint16_t &value)
+int PCA9685::setPWM(uint8_t channel, const uint16_t &value)
 {
 	if (value >= 4096) {
 		PX4_DEBUG("invalid pwm value");
-		return;
+		return PX4_ERROR;
 	}
 
 	uint8_t buf[5] = {};
@@ -158,19 +159,22 @@ void PCA9685::setPWM(uint8_t channel, const uint16_t &value)
 	int ret = transfer(buf, 5, nullptr, 0);
 
 	if (OK != ret) {
-		PX4_DEBUG("setPWM: i2c::transfer returned %d", ret);
+		PX4_INFO("setPWM: i2c::transfer returned %d", ret);
 	}
+    return ret;
 }
 
-void PCA9685::setPWM(uint8_t channel_count, const uint16_t *value)
+int PCA9685::setPWM(uint8_t channel_count, const uint16_t *value)
 {
+    PX4_INFO("setPWM: channels=%d", channel_count);
+
 	uint8_t buf[PCA9685_PWM_CHANNEL_COUNT * PCA9685_REG_LED_INCREMENT + 1] = {};
 	buf[0] = PCA9685_REG_LED0;
 
 	for (int i = 0; i < channel_count; ++i) {
 		if (value[i] >= 4096) {
 			PX4_DEBUG("invalid pwm value");
-			return;
+			return PX4_ERROR;
 		}
 
 		buf[1 + i * PCA9685_REG_LED_INCREMENT] = 0x00;
@@ -183,8 +187,9 @@ void PCA9685::setPWM(uint8_t channel_count, const uint16_t *value)
 	int ret = transfer(buf, channel_count * PCA9685_REG_LED_INCREMENT + 1, nullptr, 0);
 
 	if (OK != ret) {
-		PX4_DEBUG("setPWM: i2c::transfer returned %d", ret);
+		PX4_INFO("setPWM: i2c::transfer returned %d", ret);
 	}
+    return ret;
 }
 
 void PCA9685::disableAllOutput()
@@ -203,17 +208,21 @@ void PCA9685::disableAllOutput()
 	}
 }
 
-void PCA9685::setDivider(uint8_t value)
+int PCA9685::setDivider(uint8_t value)
 {
+    PX4_INFO("setDivider: value=%d", value);
+
 	uint8_t buf[2] = {};
 	buf[0] = PCA9685_REG_PRE_SCALE;
 	buf[1] = value;
 	int ret = transfer(buf, 2, nullptr, 0);
 
 	if (OK != ret) {
-		PX4_DEBUG("i2c::transfer returned %d", ret);
-		return;
+		PX4_INFO("setDivider: i2c::transfer returned %d", ret);
+		return ret;
 	}
+
+    return PX4_OK;
 }
 
 void PCA9685::stopOscillator()
@@ -232,6 +241,8 @@ void PCA9685::stopOscillator()
 
 void PCA9685::startOscillator()
 {
+    PX4_INFO("startOscillator...");
+
 	uint8_t buf[2] = {PCA9685_REG_MODE1};
 
 	// clear sleep bit, with restart bit = 0
@@ -239,13 +250,15 @@ void PCA9685::startOscillator()
 	int ret = transfer(buf, 2, nullptr, 0);
 
 	if (OK != ret) {
-		PX4_DEBUG("startOscillator: i2c::transfer returned %d", ret);
+		PX4_INFO("startOscillator: i2c::transfer returned %d", ret);
 		return;
 	}
 }
 
 void PCA9685::triggerRestart()
 {
+    PX4_INFO("triggerRestart...");
+
 	uint8_t buf[2] = {PCA9685_REG_MODE1};
 
 	// clear sleep bit, with restart bit = 0
@@ -254,7 +267,7 @@ void PCA9685::triggerRestart()
 	int ret = transfer(buf, 2, nullptr, 0);
 
 	if (OK != ret) {
-		PX4_DEBUG("triggerRestart: i2c::transfer returned %d", ret);
+		PX4_INFO("triggerRestart: i2c::transfer returned %d", ret);
 		return;
 	}
 }

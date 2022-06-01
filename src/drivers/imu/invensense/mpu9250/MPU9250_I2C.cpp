@@ -35,6 +35,9 @@
 
 using namespace time_literals;
 
+#undef PX4_DEBUG
+#define PX4_DEBUG PX4_INFO
+
 static constexpr int16_t combine(uint8_t msb, uint8_t lsb)
 {
 	return (msb << 8u) | lsb;

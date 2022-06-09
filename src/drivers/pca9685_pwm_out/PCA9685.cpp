@@ -119,7 +119,7 @@ int PCA9685::initReg()
     }
 
 	buf[0] = PCA9685_REG_MODE1;
-	buf[1] = DEFAULT_MODE1_CFG & (~PCA9685_MODE1_SLEEP_MASK);
+	buf[1] = DEFAULT_MODE1_CFG;
 	ret = transfer(buf, 2, nullptr, 0); // make sure oscillator is disabled
 
 	if (OK != ret) {
@@ -168,7 +168,7 @@ int PCA9685::enableAutoIncrement() {
     uint8_t buf[2] = {};
 
     buf[0] = PCA9685_REG_MODE1;
-    buf[2] = DEFAULT_MODE1_CFG | PCA9685_MODE1_AI_MASK;
+    buf[1] = DEFAULT_MODE1_CFG | PCA9685_MODE1_AI_MASK;
 
     int ret = transfer(buf, 2, nullptr, 0);
 
@@ -178,32 +178,39 @@ int PCA9685::enableAutoIncrement() {
     return ret;
 }
 
+static int counter = 0;
+
 int PCA9685::setPWM(uint8_t channel_count, const uint16_t *value)
 {
-    PX4_INFO("setPWM: channels=%d", channel_count);
-
     int ret = enableAutoIncrement();
     if (PX4_OK != ret) {
+        PX4_INFO("enableAutoIncrement failed: ret=%d", ret);
         return ret;
     }
 
 	uint8_t buf[PCA9685_PWM_CHANNEL_COUNT * PCA9685_REG_LED_INCREMENT + 1] = {};
 	buf[0] = PCA9685_REG_LED0;
 
+    counter++;
+
 	for (int i = 0; i < channel_count; ++i) {
-		if (value[i] >= 4096) {
+        if (counter % 100 == 0) {
+            PX4_INFO("PWM #%d: on=0, off=%d", i, value[i]);
+        }
+
+        if (value[i] >= 4096) {
 			PX4_DEBUG("invalid pwm value");
 			return PX4_ERROR;
 		}
 
-		buf[1 + i * PCA9685_REG_LED_INCREMENT] = 0x00;
+        buf[1 + i * PCA9685_REG_LED_INCREMENT] = 0x00;
 		buf[2 + i * PCA9685_REG_LED_INCREMENT] = 0x00;
 		buf[3 + i * PCA9685_REG_LED_INCREMENT] = (uint8_t)(value[i] & (uint8_t)0xFF);
 		buf[4 + i * PCA9685_REG_LED_INCREMENT] = value[i] != 0 ? ((uint8_t)(value[i] >> (uint8_t)8)) :
 				PCA9685_LED_ON_FULL_ON_OFF_MASK;
 	}
 
-	int ret = transfer(buf, channel_count * PCA9685_REG_LED_INCREMENT + 1, nullptr, 0);
+	ret = transfer(buf, channel_count * PCA9685_REG_LED_INCREMENT + 1, nullptr, 0);
 
 	if (OK != ret) {
 		PX4_INFO("setPWM: i2c::transfer returned %d", ret);
@@ -250,7 +257,7 @@ void PCA9685::stopOscillator()
 
 	// set to sleep
     buf[0] = PCA9685_REG_MODE1;
-	buf[1] = DEFAULT_MODE1_CFG;
+	buf[1] = DEFAULT_MODE1_CFG | PCA9685_MODE1_SLEEP_MASK;
 	int ret = transfer(buf, 2, nullptr, 0);
 
 	if (OK != ret) {
@@ -267,7 +274,7 @@ void PCA9685::startOscillator()
 
 	// clear sleep bit, with restart bit = 0
     buf[0] = PCA9685_REG_MODE1;
-	buf[1] = DEFAULT_MODE1_CFG & (~PCA9685_MODE1_SLEEP_MASK);
+	buf[1] = DEFAULT_MODE1_CFG;
 	int ret = transfer(buf, 2, nullptr, 0);
 
 	if (OK != ret) {
@@ -283,8 +290,7 @@ void PCA9685::triggerRestart()
 	uint8_t buf[2] = {PCA9685_REG_MODE1};
 
 	// clear sleep bit, with restart bit = 0
-	buf[1] = DEFAULT_MODE1_CFG & (~PCA9685_MODE1_SLEEP_MASK);
-	buf[1] |= PCA9685_MODE1_RESTART_MASK;
+	buf[1] = DEFAULT_MODE1_CFG | PCA9685_MODE1_RESTART_MASK;
 	int ret = transfer(buf, 2, nullptr, 0);
 
 	if (OK != ret) {

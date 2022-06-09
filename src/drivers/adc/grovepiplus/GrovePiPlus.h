@@ -46,12 +46,20 @@ enum class Register : uint8_t {
     ANALOG_READ = 0x03,
     ANALOG_WRITE = 0x04,
     PIN_MODE = 0x05,
-}
+};
 
 enum class PinMode : uint8_t {
     INPUT = 0x00,
     OUTPUT = 0x01,
 };
+
+#define DATA_NOT_AVAILABLE 0x17 // 23
+
+// Some other condition observed in grovepi.py???
+#define DATA_NOT_AVAILABLE2 0xff
+
+#define MAX_I2C_RETRIES_PER_CYCLE 2
+#define MAX_DATA_AVAILABLE_TRIES_PER_CYCLE 3
 
 // 10-bit resolution
 #define ADC_RESOLUTION 1023
@@ -94,7 +102,7 @@ private:
 
 	perf_counter_t			_cycle_perf;
 
-    int8_t _port_selection;
+    uint8_t _port_selection = 0;
 
-    int getMeasurement(int16_t *value);
+    int analogRead(uint8_t port, uint16_t *value_out);
 };

@@ -35,7 +35,7 @@ px4_add_module(
 	MAIN adc_grovepiplus
 	COMPILE_FLAGS
 	SRCS
-		grovepiplus_main.cpp
+		adc_grovepiplus_main.cpp
 		GrovePiPlus.cpp
 	DEPENDS
 	)

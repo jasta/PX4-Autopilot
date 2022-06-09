@@ -79,24 +79,16 @@ void GrovePiPlus::RunImpl()
 
 	_adc_report.timestamp = hrt_absolute_time();
 
-    uint8_t write_buf[4] = {};
-    write_buf[0] = Register::ANALOG_READ;
-    write_buf[1] = _port_selection;
-    write_buf[2] = 0;
-    write_buf[3] = 0;
-
-    uint8_t read_buf[2] = {};
-    int ret = transfer(write_buf, 4, &read_buf, 2);
+    uint16_t raw_value = 0;
+    int ret = analogRead(_port_selection, &raw_value);
 
     if (ret == PX4_OK) {
-        uint16_t raw_value = (read_buf[0] << 8 | read_buf[1]);
-
         _adc_report.channel_id[_port_selection] = _port_selection;
         _adc_report.raw_data[_port_selection] = raw_value;
 
         _to_adc_report.publish(_adc_report);
     } else {
-        PX4_WARN("failed to read on port %d!", _port_selection);
+        PX4_WARN("failed to read on port %d: ret=%d", _port_selection, ret);
     }
 
 	perf_end(_cycle_perf);
@@ -131,7 +123,7 @@ extern "C" int adc_grovepiplus_main(int argc, char *argv[])
 		return -1;
 	}
 
-	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_ADC_DEVTYPE_GrovePiPlus);
+	BusInstanceIterator iterator(MODULE_NAME, cli, DRV_ADC_DEVTYPE_GROVEPIPLUS);
 
 	if (!strcmp(verb, "start")) {
 		return ThisDriver::module_start(cli, iterator);

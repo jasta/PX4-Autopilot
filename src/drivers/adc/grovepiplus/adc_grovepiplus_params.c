@@ -39,5 +39,5 @@
  * @reboot_required true
  * @group Sensors
  */
-PARAM_DEFINE_INT32(ADC_GROVEPIPLUS_PORT, 2);
+PARAM_DEFINE_INT32(ADC_GROVE_PORT, 2);
 

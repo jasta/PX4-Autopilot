@@ -44,29 +44,80 @@ int GrovePiPlus::init()
 	}
 
     int32_t port_param = 0;
-    param_get(param_find("ADC_GROVEPIPLUS_PORT"), &port_param);
+    param_get(param_find("ADC_GROVE_PORT"), &port_param);
 
     _port_selection = port_param;
 
     PX4_INFO("Using port %d", port_param);
 
 	uint8_t config[4] = {};
-    config[0] = Register::PIN_MODE;
+    config[0] = (uint8_t)Register::PIN_MODE;
     config[1] = port_param;
-    config[2] = PinMode::INPUT;
+    config[2] = (uint8_t)PinMode::INPUT;
     config[3] = 0; // padding
 
-    uint8_t dummy[1] = {};
-    ret = transfer(&config, 4, &dummy, 1);
+    uint8_t dummy = 0;
+    ret = transfer(config, 4, &dummy, 1);
 
 	if (ret != PX4_OK) {
 		PX4_ERR("failed to set INPUT pin mode on port %d", port_param);
 		return ret;
 	}
 
-    PX4_INFO("dummy read=%d", dummy[0]);
+    PX4_INFO("dummy read=%d", dummy);
 
 	ScheduleOnInterval(SAMPLE_INTERVAL, SAMPLE_INTERVAL);
 
 	return PX4_OK;
+}
+
+int GrovePiPlus::analogRead(uint8_t port, uint16_t *value_out) {
+    uint8_t write_buf[4] = {};
+    write_buf[0] = (uint8_t)Register::ANALOG_READ;
+    write_buf[1] = port;
+    write_buf[2] = 0;
+    write_buf[3] = 0;
+
+    int write_cnt = 0;
+    int ret = PX4_ERROR;
+    while (ret != PX4_OK && write_cnt < MAX_I2C_RETRIES_PER_CYCLE) {
+        ret = transfer(write_buf, 4, nullptr, 0);
+        write_cnt++;
+    }
+
+    if (ret != PX4_OK) {
+        PX4_WARN("failed to send ANALOG_READ command on port %d after %d retries", port, write_cnt);
+        return ret;
+    }
+
+    uint8_t read_buf[3] = {};
+    read_buf[0] = DATA_NOT_AVAILABLE;
+    int read_failure_cnt = 0;
+    int read_cnt = 0;
+
+    while ((read_buf[0] == DATA_NOT_AVAILABLE || read_buf[0] == DATA_NOT_AVAILABLE2) &&
+           read_failure_cnt < MAX_I2C_RETRIES_PER_CYCLE &&
+           read_cnt < MAX_DATA_AVAILABLE_TRIES_PER_CYCLE) {
+        ret = transfer(nullptr, 0, read_buf, 3);
+        if (ret != PX4_OK) {
+            read_failure_cnt++;
+        } else {
+            read_failure_cnt = 0;
+        }
+        read_cnt++;
+    }
+
+    if (ret != PX4_OK) {
+        PX4_WARN("failed to read ANALOG_READ on port %d after %d failures", port, read_failure_cnt);
+        return ret;
+    }
+
+    if (read_buf[0] == DATA_NOT_AVAILABLE || read_buf[0] == DATA_NOT_AVAILABLE2) {
+        PX4_WARN("data not available from GrovePi on port %d after %d tries", port, read_cnt);
+        return PX4_ERROR;
+    }
+
+    *value_out = read_buf[1] << 8 | read_buf[2];
+
+    return PX4_OK;
 }

@@ -1,0 +1,5 @@
+menuconfig DRIVERS_ADC_GROVEPIPLUS
+	bool "adc_grovepiplus"
+	default n
+	---help---
+		Enable support for GrovePi+ built-in ADC (ports A0-A2)

@@ -66,8 +66,12 @@ static constexpr uint8_t WHOAMI = 0x71;
 static constexpr float TEMPERATURE_SENSITIVITY = 333.87f; // LSB/C
 static constexpr float TEMPERATURE_OFFSET = 21.f; // C
 
+// Sample at ~200Hz (1000 / (1+4))
+static constexpr uint8_t SAMPLE_RATE_DIVIDER = 4;
+
 enum class Register : uint8_t {
 
+	SMPLRT_DIV         = 0x19,
 	CONFIG             = 0x1A,
 	GYRO_CONFIG        = 0x1B,
 	ACCEL_CONFIG       = 0x1C,
@@ -119,7 +123,8 @@ enum CONFIG_BIT : uint8_t {
 	FIFO_MODE = Bit6, // when the FIFO is full, additional writes will not be written to FIFO
 
 	// DLPF_CFG[2:0]
-	DLPF_CFG_Fs_1KHZ          = 1, // Rate 1 kHz,  184 Hz Bandwidth
+	DLPF_CFG_Fs_1KHZ_Rate_184_Hz = 1, // Rate 1 kHz,  184 Hz Bandwidth
+	DLPF_CFG_Fs_1KHZ_Rate_41_Hz  = 3, // Rate 1 kHz,  41 Hz Bandwidth
 	DLPF_CFG_BYPASS_DLPF_8KHZ = 7, // Rate 8 kHz, 3600 Hz Bandwidth
 };
 
@@ -150,6 +155,7 @@ enum ACCEL_CONFIG2_BIT : uint8_t {
 
 	// [2:0] A_DLPFCFG
 	A_DLPFCFG_BW_218HZ_DLPF = 1, // Rate 1 kHz, 218.1 Hz Bandwidth (DLPF filter Block)
+	A_DLPFCFG_BW_41_DLPF = 3,    // Rate 1 kHz, 41 Hz Bandwidth (DLPF filter Block)
 };
 
 // FIFO_EN

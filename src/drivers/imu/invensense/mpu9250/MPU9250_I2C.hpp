@@ -70,10 +70,10 @@ private:
 	void exit_and_cleanup() override;
 
 	// Sensor Configuration
-	static constexpr float FIFO_SAMPLE_DT{1e6f / 1000.f};
+	static constexpr float FIFO_SAMPLE_DT{1e6f / (1000.f / (1 + SAMPLE_RATE_DIVIDER))};
 	static constexpr int32_t SAMPLES_PER_TRANSFER{1};                    // ensure at least 1 new accel sample per transfer
-	static constexpr float GYRO_RATE{1e6f / FIFO_SAMPLE_DT};             // 1000 Hz gyro
-	static constexpr float ACCEL_RATE{GYRO_RATE / SAMPLES_PER_TRANSFER}; // 1000 Hz accel
+	static constexpr float GYRO_RATE{1e6f / FIFO_SAMPLE_DT};
+	static constexpr float ACCEL_RATE{GYRO_RATE / SAMPLES_PER_TRANSFER};
 
 	// maximum FIFO samples per transfer is limited to the size of sensor_accel_fifo/sensor_gyro_fifo
 	static constexpr int32_t FIFO_MAX_SAMPLES{math::min(math::min(FIFO::SIZE / sizeof(FIFO::DATA), sizeof(sensor_gyro_fifo_s::x) / sizeof(sensor_gyro_fifo_s::x[0])), sizeof(sensor_accel_fifo_s::x) / sizeof(sensor_accel_fifo_s::x[0]) * (int)(GYRO_RATE / ACCEL_RATE))};
@@ -98,7 +98,7 @@ private:
 	bool Configure();
 	void ConfigureAccel();
 	void ConfigureGyro();
-	void ConfigureSampleRate(int sample_rate);
+	void ConfigureSampleRate(int max_sample_rate);
 
 	static int DataReadyInterruptCallback(int irq, void *context, void *arg);
 	void DataReady();
@@ -147,21 +147,22 @@ private:
 		FIFO_READ,
 	} _state{STATE::RESET};
 
-	uint16_t _fifo_empty_interval_us{1000}; // default 1000 us / 1000 Hz transfer interval
+	uint16_t _fifo_empty_interval_us{1000 * (1 + SAMPLE_RATE_DIVIDER)};
 	int32_t _fifo_gyro_samples{static_cast<int32_t>(_fifo_empty_interval_us / (1000000 / GYRO_RATE))};
 
 	uint8_t _checked_register{0};
-	static constexpr uint8_t size_register_cfg{9};
+	static constexpr uint8_t size_register_cfg{10};
 	register_config_t _register_cfg[size_register_cfg] {
 		// Register                     | Set bits, Clear bits
-		{ Register::CONFIG,             CONFIG_BIT::FIFO_MODE | CONFIG_BIT::DLPF_CFG_Fs_1KHZ, 0 },
-		{ Register::GYRO_CONFIG,        GYRO_CONFIG_BIT::GYRO_FS_SEL_2000_DPS, 0 },
-		{ Register::ACCEL_CONFIG,       ACCEL_CONFIG_BIT::ACCEL_FS_SEL_16G, 0 },
-		{ Register::ACCEL_CONFIG2,      ACCEL_CONFIG2_BIT::A_DLPFCFG_BW_218HZ_DLPF, 0 },
+		{ Register::CONFIG,             CONFIG_BIT::FIFO_MODE | CONFIG_BIT::DLPF_CFG_Fs_1KHZ_Rate_41_Hz,                              0 },
+		{ Register::GYRO_CONFIG,        GYRO_CONFIG_BIT::GYRO_FS_SEL_250_DPS,                                                         0 },
+		{ Register::ACCEL_CONFIG,       ACCEL_CONFIG_BIT::ACCEL_FS_SEL_2G,                                                            0 },
+		{ Register::ACCEL_CONFIG2,      ACCEL_CONFIG2_BIT::A_DLPFCFG_BW_41_DLPF,                                                    0 },
+        { Register::SMPLRT_DIV,         SAMPLE_RATE_DIVIDER,                                                                          0 },
 		{ Register::FIFO_EN,            FIFO_EN_BIT::GYRO_XOUT | FIFO_EN_BIT::GYRO_YOUT | FIFO_EN_BIT::GYRO_ZOUT | FIFO_EN_BIT::ACCEL, FIFO_EN_BIT::TEMP_OUT },
-		{ Register::INT_PIN_CFG,        INT_PIN_CFG_BIT::ACTL | INT_PIN_CFG_BIT::BYPASS_EN, 0 },
-		{ Register::INT_ENABLE,         INT_ENABLE_BIT::RAW_RDY_EN, 0 },
-		{ Register::USER_CTRL,          USER_CTRL_BIT::FIFO_EN, USER_CTRL_BIT::I2C_MST_EN | USER_CTRL_BIT::I2C_IF_DIS },
-		{ Register::PWR_MGMT_1,         PWR_MGMT_1_BIT::CLKSEL_0, PWR_MGMT_1_BIT::SLEEP },
+		{ Register::INT_PIN_CFG,        INT_PIN_CFG_BIT::BYPASS_EN,                                            0 },
+		{ Register::INT_ENABLE,         INT_ENABLE_BIT::RAW_RDY_EN,                                                                    0 },
+		{ Register::USER_CTRL,          USER_CTRL_BIT::FIFO_EN,                                                 0 },
+		{ Register::PWR_MGMT_1,         PWR_MGMT_1_BIT::CLKSEL_0,                                                                      PWR_MGMT_1_BIT::SLEEP },
 	};
 };

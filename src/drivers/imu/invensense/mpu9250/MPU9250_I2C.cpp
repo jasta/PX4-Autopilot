@@ -126,6 +126,8 @@ void MPU9250_I2C::RunImpl()
 
 	switch (_state) {
 	case STATE::RESET:
+        PX4_INFO("RESET!");
+
 		// PWR_MGMT_1: Device Reset
 		RegisterWrite(Register::PWR_MGMT_1, PWR_MGMT_1_BIT::H_RESET);
 		_reset_timestamp = now;
@@ -168,6 +170,8 @@ void MPU9250_I2C::RunImpl()
 
 	case STATE::CONFIGURE:
 		if (Configure()) {
+            PX4_INFO("configured...");
+
 			// if configure succeeded then start reading from FIFO
 			_state = STATE::FIFO_READ;
 
@@ -222,6 +226,7 @@ void MPU9250_I2C::RunImpl()
 			const uint16_t fifo_count = FIFOReadCount();
 
 			if (fifo_count >= FIFO::SIZE) {
+                PX4_WARN("fifo_count=%d, FIFO::SIZE=%d", fifo_count, FIFO::SIZE);
 				FIFOReset();
 				perf_count(_fifo_overflow_perf);
 
@@ -234,11 +239,14 @@ void MPU9250_I2C::RunImpl()
 
 				// tolerate minor jitter, leave sample to next iteration if behind by only 1
 				if (samples == _fifo_gyro_samples + 1) {
+                    PX4_WARN("samples=%d, fifo_gyro_samples=%d, timestamp_sample=%lld", samples, _fifo_gyro_samples, timestamp_sample);
 					timestamp_sample -= static_cast<int>(FIFO_SAMPLE_DT);
 					samples--;
 				}
 
 				if (samples > FIFO_MAX_SAMPLES) {
+                    PX4_WARN("samples=%d, fifo_max_samples=%d", samples, FIFO_MAX_SAMPLES);
+
 					// not technically an overflow, but more samples than we expected or can publish
 					FIFOReset();
 					perf_count(_fifo_overflow_perf);
@@ -344,16 +352,20 @@ void MPU9250_I2C::ConfigureGyro()
 	_px4_gyro.set_range(math::radians(range_dps));
 }
 
-void MPU9250_I2C::ConfigureSampleRate(int sample_rate)
+void MPU9250_I2C::ConfigureSampleRate(int max_sample_rate)
 {
+    PX4_INFO("max_sample_rate=%d", max_sample_rate);
 	// round down to nearest FIFO sample dt * SAMPLES_PER_TRANSFER
 	const float min_interval = FIFO_SAMPLE_DT * SAMPLES_PER_TRANSFER;
-	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)sample_rate) / min_interval) * min_interval, min_interval);
+	_fifo_empty_interval_us = math::max(roundf((1e6f / (float)max_sample_rate) / min_interval) * min_interval, min_interval);
+    uint16_t x = _fifo_empty_interval_us;
 
 	_fifo_gyro_samples = roundf(math::min((float)_fifo_empty_interval_us / (1e6f / GYRO_RATE), (float)FIFO_MAX_SAMPLES));
 
 	// recompute FIFO empty interval (us) with actual gyro sample limit
 	_fifo_empty_interval_us = _fifo_gyro_samples * (1e6f / GYRO_RATE);
+
+    PX4_INFO("max_sample_rate=%d, x=%d, gyro_samples=%d, empty_interval=%d", max_sample_rate, x, _fifo_gyro_samples, _fifo_empty_interval_us);
 }
 
 bool MPU9250_I2C::Configure()

@@ -79,6 +79,10 @@ bool PreFlightCheck::ekf2Check(orb_advert_t *mavlink_log_pub, vehicle_status_s &
 	const estimator_status_s &status = status_sub.get();
 
 	if (status.timestamp == 0) {
+        if (report_fail) {
+            mavlink_log_critical(mavlink_log_pub, "Preflight Fail: no estimator status");
+        }
+
 		success = false;
 		goto out;
 	}

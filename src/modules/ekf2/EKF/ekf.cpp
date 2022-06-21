@@ -172,7 +172,19 @@ bool Ekf::initialiseFilter()
 
 			_baro_counter++;
 		}
-	}
+	} else if (_gps_buffer && _gps_buffer->pop_first_older_than(_imu_sample_delayed.time_us, &_gps_sample_delayed)) {
+        // Apply a version of the hack here: https://github.com/PX4/PX4-ECL/issues/876#issuecomment-901757028
+        if (_gps_sample_delayed.time_us != 0) {
+            if (_baro_counter == 0) {
+                _baro_hgt_offset = _gps_sample_delayed.hgt;
+
+            } else {
+                _baro_hgt_offset = 0.9f * _baro_hgt_offset + 0.1f * _gps_sample_delayed.hgt;
+            }
+
+            _baro_counter++;
+        }
+    }
 
 	if (_params.mag_fusion_type <= MagFuseType::MAG_3D) {
 		if (_mag_counter < _obs_buffer_length) {
@@ -183,7 +195,7 @@ bool Ekf::initialiseFilter()
 
 	if (_baro_counter < _obs_buffer_length) {
 		// not enough baro samples accumulated
-		return false;
+//		return false;
 	}
 
 	// we use baro height initially and switch to GPS/range/EV finder later when it passes checks.

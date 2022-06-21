@@ -45,7 +45,8 @@ void PreFlightChecker::update(const float dt, const estimator_innovations_s &inn
 	_has_heading_failed = preFlightCheckHeadingFailed(innov, alpha);
 	_has_horiz_vel_failed = preFlightCheckHorizVelFailed(innov, alpha);
 	_has_vert_vel_failed = preFlightCheckVertVelFailed(innov, alpha);
-	_has_height_failed = preFlightCheckHeightFailed(innov, alpha);
+//	_has_height_failed = preFlightCheckHeightFailed(innov, alpha);
+    _has_height_failed = false;
 }
 
 bool PreFlightChecker::preFlightCheckHeadingFailed(const estimator_innovations_s &innov, const float alpha)

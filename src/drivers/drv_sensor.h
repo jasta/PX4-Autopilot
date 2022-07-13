@@ -210,6 +210,8 @@
 
 #define DRV_ADC_DEVTYPE_GROVEPIPLUS        0xB2
 
+#define DRV_BARO_DEVTYPE_BME280 0xB3
+
 #define DRV_DEVTYPE_UNUSED		0xff
 
 #endif /* _DRV_SENSOR_H */

@@ -32,8 +32,8 @@
 ############################################################################
 
 px4_add_module(
-	MODULE drivers__barometer__bmp280
-	MAIN bmp280
+	MODULE drivers__barometer__bme280
+	MAIN bme280
 	SRCS
         BME280.cpp
         BME280.hpp

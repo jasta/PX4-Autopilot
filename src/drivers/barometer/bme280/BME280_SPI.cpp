@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file bmp280_spi.cpp
+ * @file bme280_spi.cpp
  *
  * SPI interface for BME280
  */
@@ -51,16 +51,16 @@
 #pragma pack(push,1)
 struct spi_data_s {
 	uint8_t addr;
-	struct bmp280::data_s data;
+	struct bme280::data_s data;
 };
 
 struct spi_calibration_s {
 	uint8_t addr;
-	struct bmp280::calibration_s cal;
+	struct bme280::calibration_s cal;
 };
 #pragma pack(pop)
 
-class BME280_SPI: public device::SPI, public bmp280::IBME280
+class BME280_SPI: public device::SPI, public bme280::IBME280
 {
 public:
 	BME280_SPI(uint8_t bus, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
@@ -71,8 +71,8 @@ public:
 	uint8_t	get_reg(uint8_t addr) override;
 	int	set_reg(uint8_t value, uint8_t addr) override;
 
-	bmp280::data_s		*get_data(uint8_t addr) override;
-	bmp280::calibration_s	*get_calibration(uint8_t addr) override;
+	bme280::data_s		*get_data(uint8_t addr) override;
+	bme280::calibration_s	*get_calibration(uint8_t addr) override;
 
 	uint32_t get_device_id() const override { return device::SPI::get_device_id(); }
 
@@ -82,8 +82,8 @@ private:
 	spi_data_s		_data{};
 };
 
-bmp280::IBME280 *
-bmp280_spi_interface(uint8_t busnum, uint32_t device, int bus_frequency, spi_mode_e spi_mode)
+bme280::IBME280 *
+bme280_spi_interface(uint8_t busnum, uint32_t device, int bus_frequency, spi_mode_e spi_mode)
 {
 	return new BME280_SPI(busnum, device, bus_frequency, spi_mode);
 }
@@ -109,7 +109,7 @@ BME280_SPI::set_reg(uint8_t value, uint8_t addr)
 	return transfer(&cmd[0], nullptr, 2);
 }
 
-bmp280::data_s *
+bme280::data_s *
 BME280_SPI::get_data(uint8_t addr)
 {
 	_data.addr = (uint8_t)(addr | DIR_READ); // set MSB bit
@@ -122,7 +122,7 @@ BME280_SPI::get_data(uint8_t addr)
 	}
 }
 
-bmp280::calibration_s *
+bme280::calibration_s *
 BME280_SPI::get_calibration(uint8_t addr)
 {
 	_cal.addr = addr | DIR_READ;

@@ -39,12 +39,12 @@
 
 #include <drivers/drv_sensor.h>
 
-extern "C" { __EXPORT int bmp280_main(int argc, char *argv[]); }
+extern "C" { __EXPORT int bme280_main(int argc, char *argv[]); }
 
 void
 BME280::print_usage()
 {
-	PRINT_MODULE_USAGE_NAME("bmp280", "driver");
+	PRINT_MODULE_USAGE_NAME("bme280", "driver");
 	PRINT_MODULE_USAGE_SUBCATEGORY("baro");
 	PRINT_MODULE_USAGE_COMMAND("start");
 #if defined(CONFIG_I2C)
@@ -58,12 +58,12 @@ BME280::print_usage()
 
 I2CSPIDriverBase *BME280::instantiate(const I2CSPIDriverConfig &config, int runtime_instance)
 {
-	bmp280::IBME280 *interface = nullptr;
+	bme280::IBME280 *interface = nullptr;
 
 #if defined(CONFIG_I2C)
 
 	if (config.bus_type == BOARD_I2C_BUS) {
-		interface = bmp280_i2c_interface(config.bus, config.i2c_address, config.bus_frequency);
+		interface = bme280_i2c_interface(config.bus, config.i2c_address, config.bus_frequency);
 
 	}
 
@@ -71,7 +71,7 @@ I2CSPIDriverBase *BME280::instantiate(const I2CSPIDriverConfig &config, int runt
 #if defined(CONFIG_SPI)
 
 	if (config.bus_type == BOARD_SPI_BUS) {
-		interface = bmp280_spi_interface(config.bus, config.spi_devid, config.bus_frequency, config.spi_mode);
+		interface = bme280_spi_interface(config.bus, config.spi_devid, config.bus_frequency, config.spi_mode);
 	}
 
 #endif // CONFIG_SPI
@@ -103,7 +103,7 @@ I2CSPIDriverBase *BME280::instantiate(const I2CSPIDriverConfig &config, int runt
 }
 
 int
-bmp280_main(int argc, char *argv[])
+bme280_main(int argc, char *argv[])
 {
 	using ThisDriver = BME280;
 	BusCLIArguments cli{true, true};

@@ -86,6 +86,7 @@
 namespace bme280
 {
 
+// TODO: Add support for humidity data in the BME280!
 #pragma pack(push,1)
 struct calibration_s {
 	uint16_t t1;
@@ -159,8 +160,8 @@ public:
 
 /* interface factories */
 #if defined(CONFIG_SPI)
-extern bme280::IBME280 *bmp280_spi_interface(uint8_t busnum, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
+extern bme280::IBME280 *bme280_spi_interface(uint8_t busnum, uint32_t device, int bus_frequency, spi_mode_e spi_mode);
 #endif // CONFIG_SPI
 #if defined(CONFIG_I2C)
-extern bme280::IBME280 *bmp280_i2c_interface(uint8_t busnum, uint32_t device, int bus_frequency);
+extern bme280::IBME280 *bme280_i2c_interface(uint8_t busnum, uint32_t device, int bus_frequency);
 #endif // CONFIG_I2C

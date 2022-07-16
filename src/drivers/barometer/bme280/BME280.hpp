@@ -46,7 +46,7 @@
 class BME280 : public I2CSPIDriver<BME280>
 {
 public:
-	BME280(const I2CSPIDriverConfig &config, bmp280::IBME280 *interface);
+	BME280(const I2CSPIDriverConfig &config, bme280::IBME280 *interface);
 	virtual ~BME280();
 
 	static I2CSPIDriverBase *instantiate(const I2CSPIDriverConfig &config, int runtime_instance);
@@ -64,7 +64,7 @@ private:
 
 	uORB::PublicationMulti<sensor_baro_s> _sensor_baro_pub{ORB_ID(sensor_baro)};
 
-	bmp280::IBME280		*_interface;
+	bme280::IBME280		*_interface;
 
 	// set config, recommended settings
 	static constexpr uint8_t	_curr_ctrl{BME280_CTRL_P16 | BME280_CTRL_T2};
@@ -76,6 +76,6 @@ private:
 	perf_counter_t		_measure_perf;
 	perf_counter_t		_comms_errors;
 
-	bmp280::calibration_s	*_cal{nullptr}; //stored calibration constants
-	bmp280::fcalibration_s	_fcal{}; //pre processed calibration constants
+	bme280::calibration_s	*_cal{nullptr}; //stored calibration constants
+	bme280::fcalibration_s	_fcal{}; //pre processed calibration constants
 };

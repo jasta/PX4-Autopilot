@@ -33,7 +33,7 @@
 
 #include "BME280.hpp"
 
-BME280::BME280(const I2CSPIDriverConfig &config, bmp280::IBME280 *interface) :
+BME280::BME280(const I2CSPIDriverConfig &config, bme280::IBME280 *interface) :
 	I2CSPIDriver(config),
 	_interface(interface),
 	_sample_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": sample")),
@@ -146,7 +146,7 @@ BME280::collect()
 
 	// this should be fairly close to the end of the conversion, so the best approximation of the time
 	const hrt_abstime timestamp_sample = hrt_absolute_time();
-	bmp280::data_s *data = _interface->get_data(BME280_ADDR_DATA);
+	bme280::data_s *data = _interface->get_data(BME280_ADDR_DATA);
 
 	if (data == nullptr) {
 		perf_count(_comms_errors);

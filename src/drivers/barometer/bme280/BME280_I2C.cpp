@@ -32,7 +32,7 @@
  ****************************************************************************/
 
 /**
- * @file bmp280_spi.cpp
+ * @file bme280_spi.cpp
  *
  * SPI interface for BME280
  */
@@ -44,7 +44,7 @@
 
 #if defined(CONFIG_I2C)
 
-class BME280_I2C: public device::I2C, public bmp280::IBME280
+class BME280_I2C: public device::I2C, public bme280::IBME280
 {
 public:
 	BME280_I2C(uint8_t bus, uint32_t device, int bus_frequency);
@@ -55,18 +55,18 @@ public:
 	uint8_t	get_reg(uint8_t addr) override;
 	int	set_reg(uint8_t value, uint8_t addr) override;
 
-	bmp280::data_s		*get_data(uint8_t addr) override;
-	bmp280::calibration_s	*get_calibration(uint8_t addr) override;
+	bme280::data_s		*get_data(uint8_t addr) override;
+	bme280::calibration_s	*get_calibration(uint8_t addr) override;
 
 	uint32_t get_device_id() const override { return device::I2C::get_device_id(); }
 
 	uint8_t get_device_address() const override { return device::I2C::get_device_address(); }
 private:
-	bmp280::calibration_s	_cal{};
-	bmp280::data_s		_data{};
+	bme280::calibration_s	_cal{};
+	bme280::data_s		_data{};
 };
 
-bmp280::IBME280 *bmp280_i2c_interface(uint8_t busnum, uint32_t device, int bus_frequency)
+bme280::IBME280 *bme280_i2c_interface(uint8_t busnum, uint32_t device, int bus_frequency)
 {
 	return new BME280_I2C(busnum, device, bus_frequency);
 }
@@ -92,12 +92,12 @@ BME280_I2C::set_reg(uint8_t value, uint8_t addr)
 	return transfer(cmd, sizeof(cmd), nullptr, 0);
 }
 
-bmp280::data_s *
+bme280::data_s *
 BME280_I2C::get_data(uint8_t addr)
 {
 	const uint8_t cmd = addr;
 
-	if (transfer(&cmd, sizeof(cmd), (uint8_t *)&_data, sizeof(bmp280::data_s)) == OK) {
+	if (transfer(&cmd, sizeof(cmd), (uint8_t *)&_data, sizeof(bme280::data_s)) == OK) {
 		return (&_data);
 
 	} else {
@@ -105,12 +105,12 @@ BME280_I2C::get_data(uint8_t addr)
 	}
 }
 
-bmp280::calibration_s *
+bme280::calibration_s *
 BME280_I2C::get_calibration(uint8_t addr)
 {
 	const uint8_t cmd = addr;
 
-	if (transfer(&cmd, sizeof(cmd), (uint8_t *)&_cal, sizeof(bmp280::calibration_s)) == OK) {
+	if (transfer(&cmd, sizeof(cmd), (uint8_t *)&_cal, sizeof(bme280::calibration_s)) == OK) {
 		return &(_cal);
 
 	} else {

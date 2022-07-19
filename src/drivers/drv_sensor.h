@@ -212,6 +212,8 @@
 
 #define DRV_BARO_DEVTYPE_BME280 0xB3
 
+#define DRV_POWER_DEVTYPE_PIJUICE 0xB4
+
 #define DRV_DEVTYPE_UNUSED		0xff
 
 #endif /* _DRV_SENSOR_H */

@@ -1,0 +1,5 @@
+menuconfig DRIVERS_POWER_MONITOR_PIJUICE
+	bool "pijuice"
+	default n
+	---help---
+		Enable support for PiJuice power monitoring

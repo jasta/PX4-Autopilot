@@ -45,33 +45,13 @@ PiJuice::PiJuice(const I2CSPIDriverConfig &config, int battery_index) :
 	_sample_perf(perf_alloc(PC_ELAPSED, "pijuice_read")),
 	_comms_errors(perf_alloc(PC_COUNT, "pijuice_com_err")),
 	_collection_errors(perf_alloc(PC_COUNT, "pijuice_collection_err")),
+    // Err this should really be EXTERNAL, but it seems px4 isn't really set-up to support that right now
 	_battery(battery_index, this, PIJUICE_SAMPLE_INTERVAL_US, battery_status_s::BATTERY_SOURCE_POWER_MODULE)
 {
-	float fvalue = DEFAULT_MAX_CURRENT;
-	_max_current = fvalue;
-	param_t ph = param_find("PIJUICE_CURRENT");
-
-	if (ph != PARAM_INVALID && param_get(ph, &fvalue) == PX4_OK) {
-		_max_current = fvalue;
-	}
-
-	_range = _max_current > (DEFAULT_MAX_CURRENT - 1.0f) ? PIJUICE_ADCRANGE_HIGH : PIJUICE_ADCRANGE_LOW;
-
-	fvalue = DEFAULT_SHUNT;
-	_rshunt = fvalue;
-	ph = param_find("PIJUICE_SHUNT");
-
-	if (ph != PARAM_INVALID && param_get(ph, &fvalue) == PX4_OK) {
-		_rshunt = fvalue;
-	}
-
-	_current_lsb = _max_current / PIJUICE_DN_MAX;
-
-	// We need to publish immediately, to guarantee that the first instance of the driver publishes to uORB instance 0
-	_battery.setConnected(false);
-	_battery.updateVoltage(0.f);
-	_battery.updateCurrent(0.f);
-	_battery.updateAndPublishBatteryStatus(hrt_absolute_time());
+    _battery.setConnected(false);
+    _battery.updateVoltage(0.f);
+    _battery.updateCurrent(0.f);
+    _battery.updateAndPublishBatteryStatus(hrt_absolute_time());
 }
 
 PiJuice::~PiJuice()
@@ -80,29 +60,6 @@ PiJuice::~PiJuice()
 	perf_free(_sample_perf);
 	perf_free(_comms_errors);
 	perf_free(_collection_errors);
-}
-
-int PiJuice::read(uint8_t address, uint16_t &data)
-{
-	// read desired little-endian value via I2C
-	uint16_t received_bytes;
-	const int ret = transfer(&address, 1, (uint8_t *)&received_bytes, sizeof(received_bytes));
-
-	if (ret == PX4_OK) {
-		data = swap16(received_bytes);
-
-	} else {
-		perf_count(_comms_errors);
-		PX4_DEBUG("i2c::transfer returned %d", ret);
-	}
-
-	return ret;
-}
-
-int PiJuice::write(uint8_t address, uint16_t value)
-{
-	uint8_t data[3] = {address, ((uint8_t)((value & 0xff00) >> 8)), (uint8_t)(value & 0xff)};
-	return transfer(data, sizeof(data), nullptr, 0);
 }
 
 int PiJuice::init()
@@ -114,170 +71,108 @@ int PiJuice::init()
 		return ret;
 	}
 
-	if (write(PIJUICE_REG_CONFIG, (uint16_t)(PIJUICE_RST_RESET | _range)) != PX4_OK) {
-		return ret;
-	}
-
-	uint16_t shunt_calibration = static_cast<uint16_t>(PIJUICE_CONST * _current_lsb * _rshunt);
-
-	if (_range == PIJUICE_ADCRANGE_LOW) {
-		shunt_calibration *= 4;
-	}
-
-	if (write(PIJUICE_REG_SHUNTCAL, shunt_calibration) < 0) {
-		return -3;
-	}
-
-	// Set the CONFIG for max I
-	if (write(PIJUICE_REG_CONFIG, (uint16_t) _range) != PX4_OK) {
-		return ret;
-	}
-
-	// Start ADC continous mode here
-	ret = write(PIJUICE_REG_ADCCONFIG, (uint16_t)PIJUICE_ADCCONFIG);
-
-	start();
-	_sensor_ok = true;
-
-	_initialized = ret == PX4_OK;
-	return ret;
-}
-
-int PiJuice::force_init()
-{
-	int ret = init();
-
-	start();
-
-	return ret;
-}
-
-int PiJuice::probe()
-{
-	uint16_t value{0};
-
-	if (read(PIJUICE_MANUFACTURER_ID, value) != PX4_OK || value != PIJUICE_MFG_ID_TI) {
-		PX4_DEBUG("probe mfgid %d", value);
-		return -1;
-	}
-
-	if (read(PIJUICE_DEVICE_ID, value) != PX4_OK || (
-		    PIJUICE_DEVICEID(value) != PIJUICE_MFG_DIE
-	    )) {
-		PX4_DEBUG("probe die id %d", value);
-		return -1;
-	}
+    ScheduleOnInterval(PIJUICE_SAMPLE_INTERVAL_US);
 
 	return PX4_OK;
 }
 
+void PiJuice::RunImpl() {
 
-int PiJuice::collect()
-{
-	perf_begin(_sample_perf);
+    if (should_exit()) {
+        PX4_INFO("stopping");
+        return;
+    }
 
-	if (_parameter_update_sub.updated()) {
-		// Read from topic to clear updated flag
-		parameter_update_s parameter_update;
-		_parameter_update_sub.copy(&parameter_update);
+    perf_begin(_sample_perf);
 
-		updateParams();
-	}
+    bool success{true};
+    int16_t voltage{0};
+    int16_t current{0};
+    success = success && (read_battery_voltage(&voltage) == PX4_OK);
+    success = success && (read_battery_current(&current) == PX4_OK);
 
-	// read from the sensor
-	// Note: If the power module is connected backwards, then the values of _current will be negative but otherwise valid.
-	bool success{true};
-	int16_t bus_voltage{0};
-	int16_t current{0};
+    if (!success) {
+        PX4_INFO("error reading from PiJuice!");
+        voltage = current = 0;
+        perf_count(_comms_errors);
+    } else {
+        _battery.setConnected(success);
+        _battery.updateVoltage(static_cast<float>(voltage));
+        _battery.updateCurrent(static_cast<float>(current));
+        _battery.updateAndPublishBatteryStatus(hrt_absolute_time());
+    }
 
-	success = success && (read(PIJUICE_REG_VSBUS, bus_voltage) == PX4_OK);
-	success = success && (read(PIJUICE_REG_CURRENT, current) == PX4_OK);
-
-	if (!success) {
-		PX4_DEBUG("error reading from sensor");
-		bus_voltage = current = 0;
-	}
-
-	_battery.setConnected(success);
-	_battery.updateVoltage(static_cast<float>(bus_voltage * PIJUICE_VSCALE));
-	_battery.updateCurrent(static_cast<float>(current * _current_lsb));
-	_battery.updateAndPublishBatteryStatus(hrt_absolute_time());
-
-	perf_end(_sample_perf);
-
-	if (success) {
-		return PX4_OK;
-
-	} else {
-		return PX4_ERROR;
-	}
+    perf_end(_sample_perf);
 }
 
-void PiJuice::start()
-{
-	ScheduleClear();
-
-	/* reset the report ring and state machine */
-	_collect_phase = false;
-
-	_measure_interval = PIJUICE_CONVERSION_INTERVAL;
-
-	/* schedule a cycle to start things */
-	ScheduleDelayed(5);
+int PiJuice::read_battery_charge_level(int16_t *result) {
+    uint8_t output[1] = {};
+    int ret;
+    if ((ret = read_data(Command::ChargeLevel, output, 1)) != PX4_OK) {
+        return ret;
+    }
+    *result = output[0];
+    return PX4_OK;
 }
 
-void PiJuice::RunImpl()
-{
-	if (_initialized) {
-		if (_collect_phase) {
-			/* perform collection */
-			if (collect() != PX4_OK) {
-				perf_count(_collection_errors);
-				/* if error restart the measurement state machine */
-				start();
-				return;
-			}
+int PiJuice::read_battery_voltage(int32_t *result) {
+    uint8_t output[2] = {};
+    int ret;
+    if ((ret = read_data(Command::BatteryVoltage, output, 2)) != PX4_OK) {
+        return ret;
+    }
+    *result = (output[1] << 8) | output[0];
+    return PX4_OK;
+}
 
-			/* next phase is measurement */
-			_collect_phase = true;
+int PiJuice::read_battery_current(int32_t *result) {
+    uint8_t output[2] = {};
+    int ret;
+    if ((ret = read_data(Command::BatteryCurrent, output, 2)) != PX4_OK) {
+        return ret;
+    }
+    int32_t current = (output[1] << 8) | output[0];
+    if (current & (1 << 15)) {
+        i -= (1 << 16);
+    }
+    *result = current;
+    return PX4_OK;
+}
 
-			if (_measure_interval > PIJUICE_CONVERSION_INTERVAL) {
-				/* schedule a fresh cycle call when we are ready to measure again */
-				ScheduleDelayed(_measure_interval - PIJUICE_CONVERSION_INTERVAL);
-				return;
-			}
-		}
+int PiJuice::read_battery_temperature(int32_t *result) {
+    uint8_t output[2] = {};
+    int ret;
+    if ((ret = read_data(Command::BatteryTemperature, output, 2)) != PX4_OK) {
+        return ret;
+    }
+    int32_t temp = output[0];
+    if (temp & (1 << 7)) {
+        temp -= (1 << 8);
+    }
+    *result = temp;
+    return PX4_OK;
+}
 
-		/* next phase is collection */
-		_collect_phase = true;
+int PiJuice::read_data(Command command, uint8_t *output, const unsigned output_len) {
+    uint8_t write_buf[1] = { (uint8_t)command };
 
-		/* schedule a fresh cycle call when the measurement is done */
-		ScheduleDelayed(PIJUICE_CONVERSION_INTERVAL);
+    int ret;
 
-	} else {
-		_battery.setConnected(false);
-		_battery.updateVoltage(0.f);
-		_battery.updateCurrent(0.f);
-		_battery.updateAndPublishBatteryStatus(hrt_absolute_time());
+    if ((ret = transfer(write_buf, 1, output, output_len)) != PX4_OK) {
+        return ret;
+    }
 
-		if (init() != PX4_OK) {
-			ScheduleDelayed(PIJUICE_INIT_RETRY_INTERVAL_US);
-		}
-	}
+    // TODO: pijuice.py does checksumming, should we?
+
+    return PX4_OK;
 }
 
 void PiJuice::print_status()
 {
 	I2CSPIDriverBase::print_status();
 
-	if (_initialized) {
-		perf_print_counter(_sample_perf);
-		perf_print_counter(_comms_errors);
+    perf_print_counter(_sample_perf);
+    perf_print_counter(_comms_errors);
 
-		printf("poll interval:  %u \n", _measure_interval);
-
-	} else {
-		PX4_INFO("Device not initialized. Retrying every %d ms until battery is plugged in.",
-			 PIJUICE_INIT_RETRY_INTERVAL_US / 1000);
-	}
+    printf("poll interval:  %u \n", PIJUICE_SAMPLE_INTERVAL_US);
 }

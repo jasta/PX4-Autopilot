@@ -53,7 +53,14 @@ using namespace time_literals;
 #define PIJUICE_SAMPLE_FREQUENCY_HZ           1
 #define PIJUICE_SAMPLE_INTERVAL_US            (1_s / PIJUICE_SAMPLE_FREQUENCY_HZ)
 
-class PiJuice : public device::I2C, public ModuleParams, public I2CSPIDriver<PiJuice>
+enum class Command : uint8_t {
+    ChargeLevel = 0x41,
+    BatteryTemperature = 0x47,
+    BatteryVoltage = 0x49,
+    BatteryCurrent = 0x4b,
+};
+
+class PiJuice : public device::I2C, public I2CSPIDriver<PiJuice>
 {
 public:
 	PiJuice(const I2CSPIDriverConfig &config, int battery_index);
@@ -71,49 +78,18 @@ public:
 	*/
 	void print_status() override;
 
-protected:
-	int probe() override;
-
 private:
-	bool _sensor_ok{false};
 	unsigned int _measure_interval{0};
-	bool _collect_phase{false};
-	bool _initialized{false};
 
 	perf_counter_t _sample_perf;
 	perf_counter_t _comms_errors;
-	perf_counter_t _collection_errors;
-
-	// Configuration state, computed from params
-	float _max_current;
-	float _rshunt;
-	float _current_lsb;
-	int16_t _range;
 
 	Battery _battery;
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
-	int read(uint8_t address, uint16_t &data);
-	int write(uint8_t address, uint16_t data);
+    int read_battery_charge_level(int16_t *result);
+    int read_battery_voltage(int32_t *result);
+    int read_battery_current(int32_t *result);
+    int read_battery_temperature(int32_t *result);
 
-	int read(uint8_t address, int16_t &data)
-	{
-		return read(address, (uint16_t &)data);
-	}
-
-	int write(uint8_t address, int16_t data)
-	{
-		return write(address, (uint16_t)data);
-	}
-
-	/**
-	* Initialise the automatic measurement state machine and start it.
-	*
-	* @note This function is called at open and error time.  It might make sense
-	*       to make it more aggressive about resetting the bus in case of errors.
-	*/
-	void start();
-
-	int collect();
-
+    int read_data(Command command, uint8_t *output, const unsigned output_len);
 };

@@ -1,0 +1,13 @@
+[Unit]
+Description=GrovePi PX4 Boat
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/home/jasta/px4.sh
+WorkingDirectory=/home/jasta/px4
+
+[Install]
+WantedBy=multi-user.target

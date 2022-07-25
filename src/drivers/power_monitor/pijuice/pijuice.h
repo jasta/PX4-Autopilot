@@ -41,26 +41,46 @@
 #include <lib/perf/perf_counter.h>
 #include <battery/battery.h>
 #include <drivers/drv_hrt.h>
-#include <uORB/SubscriptionInterval.hpp>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/SubscriptionInterval.hpp>
 #include <px4_platform_common/i2c_spi_buses.h>
 
 using namespace time_literals;
-
-/* Configuration Constants */
-#define PIJUICE_BASEADDR 	            0x12
 
 #define PIJUICE_SAMPLE_FREQUENCY_HZ           1
 #define PIJUICE_SAMPLE_INTERVAL_US            (1_s / PIJUICE_SAMPLE_FREQUENCY_HZ)
 
 enum class Command : uint8_t {
+    Status = 0x40,
     ChargeLevel = 0x41,
     BatteryTemperature = 0x47,
     BatteryVoltage = 0x49,
     BatteryCurrent = 0x4b,
 };
 
-class PiJuice : public device::I2C, public I2CSPIDriver<PiJuice>
+enum BatteryStatus {
+    BATTERY_NORMAL = 0,
+    CHARGING_FROM_IN,
+    CHARGING_FROM_5V_IO,
+    BATTERY_NOT_PRESENT,
+};
+
+enum ChargeStatus {
+    POWER_NOT_PRESENT = 0,
+    POWER_BAD,
+    POWER_WEAK,
+    POWER_PRESENT,
+};
+
+typedef struct {
+    bool is_fault;
+    bool is_button;
+    BatteryStatus battery_status;
+    ChargeStatus charge_status;
+    ChargeStatus charge_status_5v;
+} pijuice_status_t;
+
+class PiJuice : public device::I2C, ModuleParams, public I2CSPIDriver<PiJuice>
 {
 public:
 	PiJuice(const I2CSPIDriverConfig &config, int battery_index);
@@ -79,17 +99,27 @@ public:
 	void print_status() override;
 
 private:
-	unsigned int _measure_interval{0};
+	uint8_t _battery_index;
 
 	perf_counter_t _sample_perf;
 	perf_counter_t _comms_errors;
 
-	Battery _battery;
+    /** @param _crit_thr Critical battery threshold param. */
+    float _crit_thr{0.f};
 
-    int read_battery_charge_level(int16_t *result);
-    int read_battery_voltage(int32_t *result);
-    int read_battery_current(int32_t *result);
-    int read_battery_temperature(int32_t *result);
+    /** @param _emergency_thr Emergency battery threshold param. */
+    float _emergency_thr{0.f};
+
+    /** @param _low_thr Low battery threshold param. */
+    float _low_thr{0.f};
+
+    uORB::PublicationMulti<battery_status_s> _battery_status_pub{ORB_ID(battery_status)};
+
+    int read_battery_status(pijuice_status_t *result);
+    int read_battery_charge_level(uint8_t *result);
+    int read_battery_voltage(uint16_t *result);
+    int read_battery_current(int16_t *result);
+    int read_battery_temperature(int8_t *result);
 
     int read_data(Command command, uint8_t *output, const unsigned output_len);
 };

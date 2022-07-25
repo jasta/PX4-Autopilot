@@ -44,12 +44,7 @@ I2CSPIDriverBase *PiJuice::instantiate(const I2CSPIDriverConfig &config, int run
 		return nullptr;
 	}
 
-	if (config.keep_running) {
-		if (instance->force_init() != PX4_OK) {
-			PX4_INFO("Failed to init PiJuice on bus %d, but will try again periodically.", config.bus);
-		}
-
-	} else if (instance->init() != PX4_OK) {
+    if (instance->init() != PX4_OK) {
 		delete instance;
 		return nullptr;
 	}
@@ -83,7 +78,7 @@ pijuice_main(int argc, char *argv[])
 	int ch;
 	using ThisDriver = PiJuice;
 	BusCLIArguments cli{true, false};
-	cli.i2c_address = PIJUICE_BASEADDR;
+	cli.i2c_address = 0x14;
 	cli.default_i2c_frequency = 100000;
 	cli.support_keep_running = true;
 	cli.custom1 = 1;

@@ -40,18 +40,13 @@
 
 PiJuice::PiJuice(const I2CSPIDriverConfig &config, int battery_index) :
 	I2C(config),
-	ModuleParams(nullptr),
+    ModuleParams(nullptr),
 	I2CSPIDriver(config),
+    _battery_index((uint8_t)battery_index),
 	_sample_perf(perf_alloc(PC_ELAPSED, "pijuice_read")),
-	_comms_errors(perf_alloc(PC_COUNT, "pijuice_com_err")),
-	_collection_errors(perf_alloc(PC_COUNT, "pijuice_collection_err")),
-    // Err this should really be EXTERNAL, but it seems px4 isn't really set-up to support that right now
-	_battery(battery_index, this, PIJUICE_SAMPLE_INTERVAL_US, battery_status_s::BATTERY_SOURCE_POWER_MODULE)
+	_comms_errors(perf_alloc(PC_COUNT, "pijuice_com_err"))
 {
-    _battery.setConnected(false);
-    _battery.updateVoltage(0.f);
-    _battery.updateCurrent(0.f);
-    _battery.updateAndPublishBatteryStatus(hrt_absolute_time());
+    _battery_status_pub.advertise();
 }
 
 PiJuice::~PiJuice()
@@ -59,7 +54,6 @@ PiJuice::~PiJuice()
 	/* free perf counters */
 	perf_free(_sample_perf);
 	perf_free(_comms_errors);
-	perf_free(_collection_errors);
 }
 
 int PiJuice::init()
@@ -70,6 +64,11 @@ int PiJuice::init()
 	if (I2C::init() != PX4_OK) {
 		return ret;
 	}
+
+    // Read battery threshold params on startup.
+    param_get(param_find("BAT_CRIT_THR"), &_crit_thr);
+    param_get(param_find("BAT_LOW_THR"), &_low_thr);
+    param_get(param_find("BAT_EMERGEN_THR"), &_emergency_thr);
 
     ScheduleOnInterval(PIJUICE_SAMPLE_INTERVAL_US);
 
@@ -85,27 +84,98 @@ void PiJuice::RunImpl() {
 
     perf_begin(_sample_perf);
 
-    bool success{true};
-    int16_t voltage{0};
-    int16_t current{0};
-    success = success && (read_battery_voltage(&voltage) == PX4_OK);
-    success = success && (read_battery_current(&current) == PX4_OK);
+    battery_status_s report = {};
+    int ret = PX4_OK;
+    pijuice_status_t status;
+    uint16_t raw_voltage{0};
+    int16_t raw_current{0};
+    int8_t raw_temp{0};
+    uint8_t charge_level{0};
 
-    if (!success) {
+    report.id = _battery_index;
+    report.source = battery_status_s::BATTERY_SOURCE_EXTERNAL;
+    report.timestamp = hrt_absolute_time();
+    report.connected = true;
+
+    report.scale = -1;
+    report.cell_count = 1;
+
+    ret |= read_battery_voltage(&raw_voltage);
+    float voltage = raw_voltage / 1000.f;
+    report.voltage_cell_v[0] = voltage;
+    report.voltage_v = voltage;
+    report.voltage_filtered_v = voltage;
+
+    ret |= read_battery_current(&raw_current);
+    float current = raw_current / 1000.f;
+    report.current_a = current;
+    report.current_filtered_a = current;
+    report.current_average_a = -1;
+    report.discharged_mah = -1;
+
+    ret |= read_battery_charge_level(&charge_level);
+    float remaining = charge_level / 100.f;
+    report.remaining = remaining;
+
+    report.time_remaining_s = NAN;
+
+    ret |= read_battery_temperature(&raw_temp);
+    report.temperature = raw_temp;
+
+    ret |= read_battery_status(&status);
+    if (status.battery_status == BATTERY_NOT_PRESENT) {
+        report.warning = battery_status_s::BATTERY_STATE_UNHEALTHY;
+    } else {
+        ChargeStatus charge_source = status.charge_status;
+        if (status.charge_status_5v != POWER_NOT_PRESENT) {
+            charge_source = status.charge_status_5v;
+        }
+        switch (charge_source) {
+            case POWER_BAD:
+            case POWER_WEAK:
+            case POWER_NOT_PRESENT:
+                if (remaining > _low_thr) {
+                    report.warning = battery_status_s::BATTERY_WARNING_NONE;
+                } else if (remaining > _crit_thr) {
+                    report.warning = battery_status_s::BATTERY_WARNING_LOW;
+                } else if (remaining > _emergency_thr) {
+                    report.warning = battery_status_s::BATTERY_WARNING_CRITICAL;
+                } else {
+                    report.warning = battery_status_s::BATTERY_WARNING_EMERGENCY;
+                }
+                break;
+            case POWER_PRESENT:
+                report.warning = battery_status_s::BATTERY_STATE_CHARGING;
+                break;
+        }
+    }
+
+    if (ret != PX4_OK) {
         PX4_INFO("error reading from PiJuice!");
-        voltage = current = 0;
         perf_count(_comms_errors);
     } else {
-        _battery.setConnected(success);
-        _battery.updateVoltage(static_cast<float>(voltage));
-        _battery.updateCurrent(static_cast<float>(current));
-        _battery.updateAndPublishBatteryStatus(hrt_absolute_time());
+        _battery_status_pub.publish(report);
     }
 
     perf_end(_sample_perf);
 }
 
-int PiJuice::read_battery_charge_level(int16_t *result) {
+int PiJuice::read_battery_status(pijuice_status_t *result) {
+    uint8_t output[1] = {};
+    int ret;
+    if ((ret = read_data(Command::Status, output, 1)) != PX4_OK) {
+        return ret;
+    }
+    uint8_t d = output[0];
+    result->is_fault = (d & 0x01) == 0x01;
+    result->is_button = (d & 0x02) == 0x02;
+    result->battery_status = static_cast<BatteryStatus>((d >> 2) & 0x03);
+    result->charge_status = static_cast<ChargeStatus>((d >> 4) & 0x03);
+    result->charge_status_5v = static_cast<ChargeStatus>((d >> 6) & 0x03);
+    return PX4_OK;
+}
+
+int PiJuice::read_battery_charge_level(uint8_t *result) {
     uint8_t output[1] = {};
     int ret;
     if ((ret = read_data(Command::ChargeLevel, output, 1)) != PX4_OK) {
@@ -115,7 +185,7 @@ int PiJuice::read_battery_charge_level(int16_t *result) {
     return PX4_OK;
 }
 
-int PiJuice::read_battery_voltage(int32_t *result) {
+int PiJuice::read_battery_voltage(uint16_t *result) {
     uint8_t output[2] = {};
     int ret;
     if ((ret = read_data(Command::BatteryVoltage, output, 2)) != PX4_OK) {
@@ -125,7 +195,7 @@ int PiJuice::read_battery_voltage(int32_t *result) {
     return PX4_OK;
 }
 
-int PiJuice::read_battery_current(int32_t *result) {
+int PiJuice::read_battery_current(int16_t *result) {
     uint8_t output[2] = {};
     int ret;
     if ((ret = read_data(Command::BatteryCurrent, output, 2)) != PX4_OK) {
@@ -133,13 +203,13 @@ int PiJuice::read_battery_current(int32_t *result) {
     }
     int32_t current = (output[1] << 8) | output[0];
     if (current & (1 << 15)) {
-        i -= (1 << 16);
+        current -= (1 << 16);
     }
     *result = current;
     return PX4_OK;
 }
 
-int PiJuice::read_battery_temperature(int32_t *result) {
+int PiJuice::read_battery_temperature(int8_t *result) {
     uint8_t output[2] = {};
     int ret;
     if ((ret = read_data(Command::BatteryTemperature, output, 2)) != PX4_OK) {

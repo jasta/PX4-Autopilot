@@ -78,6 +78,7 @@
 #include <linux/spi/spidev.h>
 #endif /* __PX4_LINUX */
 
+#define TIMEOUT_0_5HZ   2300    //!< Timeout time in mS, 2000 mS (1Hz) + 300 mS delta for error
 #define TIMEOUT_1HZ		1300	//!< Timeout time in mS, 1000 mS (1Hz) + 300 mS delta for error
 #define TIMEOUT_5HZ		500		//!< Timeout time in mS,  200 mS (5Hz) + 300 mS delta for error
 #define RATE_MEASUREMENT_PERIOD 5000000
@@ -923,6 +924,14 @@ GPS::run()
 				 * possibly lowering the navigation rate all the way to 1 Hz while doing so. */
 				receive_timeout = TIMEOUT_1HZ;
 			}
+
+            // Err, for some reason my GPS unit
+            // (PA1616D-based, https://www.adafruit.com/product/4279) updates at almost exactly
+            // 1300ms, so the original TIMEOUT_1HZ value frequently still times out.  TIMEOUT_5HZ
+            // isn't even close to right!  This seems to be because I'm not sending the
+            // $PMTK220,200*2C message that the MTK driver would send to achieve 5Hz update rates.
+            // Sigh, whatever.
+            receive_timeout = TIMEOUT_0_5HZ;
 
 			while ((helper_ret = _helper->receive(receive_timeout)) > 0 && !should_exit()) {
 

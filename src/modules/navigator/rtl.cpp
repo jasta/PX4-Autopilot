@@ -285,7 +285,9 @@ void RTL::on_activation()
 
 		// If lower than return altitude, climb up first.
 		// If rtl_alt_min is true then forcing altitude change even if above.
-		_rtl_state = RTL_STATE_CLIMB;
+//		_rtl_state = RTL_STATE_CLIMB;
+// Uhh, we don't fly :)
+        _rtl_state = RTL_STATE_RETURN;
 
 	} else {
 		// Otherwise go straight to return

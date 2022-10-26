@@ -43,32 +43,44 @@ int GrovePiPlus::init()
 		return ret;
 	}
 
-    int32_t port_param = 0;
-    param_get(param_find("ADC_GROVE_PORT"), &port_param);
+    int32_t voltage_port_param = 0;
+    param_get(param_find("ADC_PORT_VOLTAGE"), &voltage_port_param);
 
-    _port_selection = port_param;
+    int32_t current_port_param = 0;
+    param_get(param_find("ADC_PORT_CURRENT"), &current_port_param);
 
-    PX4_INFO("Using port %d", port_param);
+    _voltage_port_selection = voltage_port_param;
+    _current_port_selection = current_port_param;
 
-	uint8_t config[4] = {};
-    config[0] = (uint8_t)Register::PIN_MODE;
-    config[1] = port_param;
-    config[2] = (uint8_t)PinMode::INPUT;
-    config[3] = 0; // padding
+    PX4_INFO("Using port %d for voltage", voltage_port_param);
+    pinMode(voltage_port_param, PinMode::INPUT);
 
-    uint8_t dummy = 0;
-    ret = transfer(config, 4, &dummy, 1);
-
-	if (ret != PX4_OK) {
-		PX4_ERR("failed to set INPUT pin mode on port %d", port_param);
-		return ret;
-	}
-
-    PX4_INFO("dummy read=%d", dummy);
+    PX4_INFO("Using port %d for current", current_port_param);
+    pinMode(current_port_param, PinMode::INPUT);
 
 	ScheduleOnInterval(SAMPLE_INTERVAL, SAMPLE_INTERVAL);
 
 	return PX4_OK;
+}
+
+int GrovePiPlus::pinMode(uint8_t port, PinMode mode) {
+    uint8_t config[4] = {};
+    config[0] = (uint8_t)Register::PIN_MODE;
+    config[1] = port;
+    config[2] = (uint8_t)PinMode::INPUT;
+    config[3] = 0; // padding
+
+    uint8_t dummy = 0;
+    int ret = transfer(config, 4, &dummy, 1);
+
+    if (ret != PX4_OK) {
+        PX4_ERR("failed to set INPUT pin mode on port %d", port);
+        return ret;
+    }
+
+    PX4_INFO("dummy read=%d", dummy);
+
+    return ret;
 }
 
 int GrovePiPlus::analogRead(uint8_t port, uint16_t *value_out) {

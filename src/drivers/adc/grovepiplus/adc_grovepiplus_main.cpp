@@ -79,19 +79,31 @@ void GrovePiPlus::RunImpl()
 
 	_adc_report.timestamp = hrt_absolute_time();
 
-    uint16_t raw_value = 0;
-    int ret = analogRead(_port_selection, &raw_value);
+    bool partial_success = false;
+    partial_success |= readAndPopulateAdcReport(_voltage_port_selection, &_adc_report) == PX4_OK;
+    partial_success |= readAndPopulateAdcReport(_current_port_selection, &_adc_report) == PX4_OK;
 
-    if (ret == PX4_OK) {
-        _adc_report.channel_id[_port_selection] = _port_selection;
-        _adc_report.raw_data[_port_selection] = raw_value;
-
+    if (partial_success) {
         _to_adc_report.publish(_adc_report);
     } else {
-        PX4_WARN("failed to read on port %d: ret=%d", _port_selection, ret);
+        PX4_WARN("failed to read on port %d or %d!", _voltage_port_selection, _current_port_selection);
     }
 
 	perf_end(_cycle_perf);
+}
+
+int GrovePiPlus::readAndPopulateAdcReport(uint8_t port, adc_report_s *report_out) {
+    uint16_t raw_value = 0;
+    int ret = analogRead(port, &raw_value);
+
+    if (ret == PX4_OK) {
+        report_out->channel_id[port] = port;
+        report_out->raw_data[port] = raw_value;
+    } else {
+        PX4_WARN("failed to read on port %d: ret=%d", port, ret);
+    }
+
+    return ret;
 }
 
 void GrovePiPlus::print_usage()

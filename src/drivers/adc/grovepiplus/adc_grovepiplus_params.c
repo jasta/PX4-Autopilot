@@ -39,5 +39,15 @@
  * @reboot_required true
  * @group Sensors
  */
-PARAM_DEFINE_INT32(ADC_GROVE_PORT, 2);
+PARAM_DEFINE_INT32(ADC_PORT_VOLTAGE, 2);
+
+/**
+ * Select GrovePi+ analog port (A0 thru A2) to use for reading current.
+ *
+ * @min 0
+ * @max 2
+ * @reboot_required true
+ * @group Sensors
+ */
+PARAM_DEFINE_INT32(ADC_PORT_CURRENT, 1);
 

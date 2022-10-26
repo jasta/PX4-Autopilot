@@ -102,7 +102,10 @@ private:
 
 	perf_counter_t			_cycle_perf;
 
-    uint8_t _port_selection = 0;
+    uint8_t _voltage_port_selection = -1;
+    uint8_t _current_port_selection = -1;
 
+    int readAndPopulateAdcReport(uint8_t port, adc_report_s *value_out);
+    int pinMode(uint8_t port, PinMode mode);
     int analogRead(uint8_t port, uint16_t *value_out);
 };
